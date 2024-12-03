@@ -8,7 +8,7 @@ import (
 	"cosmossdk.io/math"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	types "github.com/cosmos/cosmos-sdk/x/staking/types"
+	"github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
 // Slash a validator for an infraction committed at a known height
@@ -242,6 +242,18 @@ func (k Keeper) SlashUnbondingDelegation(ctx context.Context, unbondingDelegatio
 	totalSlashAmount = math.ZeroInt()
 	burnedAmount := math.ZeroInt()
 
+	// compute operator address; to be used later when calling hooks
+	operatorAddress, err := k.ValidatorAddressCodec().StringToBytes(unbondingDelegation.ValidatorAddress)
+	if err != nil {
+		return math.ZeroInt(), err
+	}
+
+	// compute delegator address; to be used later when calling hooks
+	delegatorAddress, err := k.authKeeper.AddressCodec().StringToBytes(unbondingDelegation.DelegatorAddress)
+	if err != nil {
+		return math.ZeroInt(), err
+	}
+
 	// perform slashing on all entries within the unbonding delegation
 	for i, entry := range unbondingDelegation.Entries {
 		// If unbonding started before this height, stake didn't contribute to infraction
@@ -280,6 +292,17 @@ func (k Keeper) SlashUnbondingDelegation(ctx context.Context, unbondingDelegatio
 
 	if err := k.burnNotBondedTokens(ctx, burnedAmount); err != nil {
 		return math.ZeroInt(), err
+	}
+
+	// Call the after-unbonding-delegation-slashed hook if the burned amount is greater than zero. The burned amount is
+	// used instead of the slashed amount because it represents the actual number of tokens that were slashed.
+	// In other words, if no tokens were burned, the unbonding delegation was not slashed.
+	if burnedAmount.IsPositive() {
+		if err := k.Hooks().AfterUnbondingDelegationSlashed(
+			ctx, operatorAddress, delegatorAddress, burnedAmount,
+		); err != nil {
+			k.Logger(ctx).Error("failed to call after unbonding delegation slashed hook", "error", err)
+		}
 	}
 
 	return totalSlashAmount, nil
