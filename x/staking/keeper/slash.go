@@ -243,15 +243,15 @@ func (k Keeper) SlashUnbondingDelegation(ctx context.Context, unbondingDelegatio
 	burnedAmount := math.ZeroInt()
 
 	// compute operator address; to be used later when calling hooks
-	operatorAddress, err := k.ValidatorAddressCodec().StringToBytes(unbondingDelegation.ValidatorAddress)
+	validatorAddress, err := k.ValidatorAddressCodec().StringToBytes(unbondingDelegation.ValidatorAddress)
 	if err != nil {
-		return math.ZeroInt(), err
+		return math.ZeroInt(), fmt.Errorf("SlashUnbondingDelegation: could not parse validator address: %w", err)
 	}
 
 	// compute delegator address; to be used later when calling hooks
 	delegatorAddress, err := k.authKeeper.AddressCodec().StringToBytes(unbondingDelegation.DelegatorAddress)
 	if err != nil {
-		return math.ZeroInt(), err
+		return math.ZeroInt(), fmt.Errorf("SlashUnbondingDelegation: could not parse delegator address: %w", err)
 	}
 
 	// perform slashing on all entries within the unbonding delegation
@@ -299,8 +299,12 @@ func (k Keeper) SlashUnbondingDelegation(ctx context.Context, unbondingDelegatio
 	// In other words, if no tokens were burned, the unbonding delegation was not slashed.
 	if burnedAmount.IsPositive() {
 		if err := k.Hooks().AfterUnbondingDelegationSlashed(
-			ctx, operatorAddress, delegatorAddress, burnedAmount,
+			ctx, validatorAddress, delegatorAddress, burnedAmount,
 		); err != nil {
+			// To maintain a general implementation in the staking module, the responsibility for halting chain
+			// execution is delegated to the individual modules that implement this hook. Errors are logged if they
+			// occur, as not all modules may require the chain to halt upon encountering an error. If a module needs to
+			// stop execution, it should explicitly trigger a panic within the logic of AfterUnbondingDelegationSlashed.
 			k.Logger(ctx).Error("failed to call after unbonding delegation slashed hook", "error", err)
 		}
 	}
