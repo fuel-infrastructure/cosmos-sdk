@@ -584,6 +584,20 @@ func (mr *MockStakingHooksMockRecorder) AfterDelegationModified(ctx, delAddr, va
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterDelegationModified", reflect.TypeOf((*MockStakingHooks)(nil).AfterDelegationModified), ctx, delAddr, valAddr)
 }
 
+// AfterRedelegationSlashed mocks base method.
+func (m *MockStakingHooks) AfterRedelegationSlashed(ctx context.Context, valAddr types.ValAddress, delAddr types.AccAddress, slashedAmount math.Int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AfterRedelegationSlashed", ctx, valAddr, delAddr, slashedAmount)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AfterRedelegationSlashed indicates an expected call of AfterRedelegationSlashed.
+func (mr *MockStakingHooksMockRecorder) AfterRedelegationSlashed(ctx, valAddr, delAddr, slashedAmount interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterRedelegationSlashed", reflect.TypeOf((*MockStakingHooks)(nil).AfterRedelegationSlashed), ctx, valAddr, delAddr, slashedAmount)
+}
+
 // AfterUnbondingDelegationSlashed mocks base method.
 func (m *MockStakingHooks) AfterUnbondingDelegationSlashed(ctx context.Context, valAddr types.ValAddress, delAddr types.AccAddress, slashedAmount math.Int) error {
 	m.ctrl.T.Helper()
@@ -666,6 +680,20 @@ func (m *MockStakingHooks) AfterValidatorRemoved(ctx context.Context, consAddr t
 func (mr *MockStakingHooksMockRecorder) AfterValidatorRemoved(ctx, consAddr, valAddr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterValidatorRemoved", reflect.TypeOf((*MockStakingHooks)(nil).AfterValidatorRemoved), ctx, consAddr, valAddr)
+}
+
+// AfterValidatorSlashed mocks base method.
+func (m *MockStakingHooks) AfterValidatorSlashed(ctx context.Context, valAddr types.ValAddress, fraction math.LegacyDec, valSlashedAmt math.Int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AfterValidatorSlashed", ctx, valAddr, fraction, valSlashedAmt)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AfterValidatorSlashed indicates an expected call of AfterValidatorSlashed.
+func (mr *MockStakingHooksMockRecorder) AfterValidatorSlashed(ctx, valAddr, fraction, valSlashedAmt interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterValidatorSlashed", reflect.TypeOf((*MockStakingHooks)(nil).AfterValidatorSlashed), ctx, valAddr, fraction, valSlashedAmt)
 }
 
 // BeforeDelegationCreated mocks base method.
