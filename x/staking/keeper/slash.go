@@ -203,7 +203,7 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 		// execution is delegated to the individual modules that implement this hook. Errors are logged if they
 		// occur, as not all modules may require the chain to halt upon encountering an error. If a module needs to
 		// stop execution, it should explicitly trigger a panic within the logic of AfterValidatorSlashed.
-		k.Logger(ctx).Error("failed to call after after validator slashed hook", "error", err)
+		k.Logger(ctx).Error("failed to call after validator slashed hook", "error", err)
 	}
 
 	logger.Info(
