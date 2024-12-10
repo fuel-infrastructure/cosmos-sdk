@@ -438,5 +438,21 @@ func (k Keeper) SlashRedelegation(ctx context.Context, srcValidator types.Valida
 		return math.ZeroInt(), err
 	}
 
+	// Call the after-redelegation-slashed hook if the sum of burned amounts is greater than zero. We are using the
+	// burned amounts instead of the slashed amount because it represents the actual number of tokens that were slashed.
+	// In other words, if no tokens were burned, the redelegation was not slashed.
+	// NOTE: In a redelegation we are actually slashing the validator receiving the redelegation, therefore, the valAddr
+	// in the hook must be set to the dst validator.
+	burnedAmount := bondedBurnedAmount.Add(notBondedBurnedAmount)
+	if burnedAmount.IsPositive() {
+		if err := k.Hooks().AfterRedelegationSlashed(ctx, valDstAddr, delegatorAddress, burnedAmount); err != nil {
+			// To maintain a general implementation in the staking module, the responsibility for halting chain
+			// execution is delegated to the individual modules that implement this hook. Errors are logged if they
+			// occur, as not all modules may require the chain to halt upon encountering an error. If a module needs to
+			// stop execution, it should explicitly trigger a panic within the logic of AfterRedelegationSlashed.
+			k.Logger(ctx).Error("failed to call after redelegation slashed hook", "error", err)
+		}
+	}
+
 	return totalSlashAmount, nil
 }

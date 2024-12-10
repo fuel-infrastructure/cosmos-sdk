@@ -127,3 +127,14 @@ func (h MultiStakingHooks) AfterUnbondingDelegationSlashed(
 	}
 	return nil
 }
+
+func (h MultiStakingHooks) AfterRedelegationSlashed(
+	ctx context.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress, slashedAmount sdkmath.Int,
+) error {
+	for i := range h {
+		if err := h[i].AfterRedelegationSlashed(ctx, valAddr, delAddr, slashedAmount); err != nil {
+			return err
+		}
+	}
+	return nil
+}
