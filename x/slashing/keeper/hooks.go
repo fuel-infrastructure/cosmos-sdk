@@ -104,3 +104,7 @@ func (h Hooks) AfterUnbondingDelegationSlashed(_ context.Context, _ sdk.ValAddre
 func (h Hooks) AfterRedelegationSlashed(_ context.Context, _ sdk.ValAddress, _ sdk.AccAddress, _ sdkmath.Int) error {
 	return nil
 }
+
+func (h Hooks) AfterValidatorSlashed(_ context.Context, _ sdk.ValAddress, _ sdkmath.LegacyDec, _ sdkmath.Int) error {
+	return nil
+}

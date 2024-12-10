@@ -138,3 +138,14 @@ func (h MultiStakingHooks) AfterRedelegationSlashed(
 	}
 	return nil
 }
+
+func (h MultiStakingHooks) AfterValidatorSlashed(
+	ctx context.Context, valAddr sdk.ValAddress, fraction sdkmath.LegacyDec, valSlashedAmt sdkmath.Int,
+) error {
+	for i := range h {
+		if err := h[i].AfterValidatorSlashed(ctx, valAddr, fraction, valSlashedAmt); err != nil {
+			return err
+		}
+	}
+	return nil
+}

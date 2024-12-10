@@ -117,6 +117,9 @@ type StakingHooks interface {
 	AfterRedelegationSlashed(
 		ctx context.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress, slashedAmount math.Int,
 	) error
+	AfterValidatorSlashed(
+		ctx context.Context, valAddr sdk.ValAddress, fraction math.LegacyDec, valSlashedAmt math.Int,
+	) error
 }
 
 // StakingHooksWrapper is a wrapper for modules to inject StakingHooks using depinject.

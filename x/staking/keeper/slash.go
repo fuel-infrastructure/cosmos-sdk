@@ -160,8 +160,12 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 	}
 
 	// we need to calculate the *effective* slash fraction for distribution
+	// note: validator.Tokens are always positive at this stage, otherwise, they would have caused tokensToBurn to be
+	// equal to zero and hence the tokensToBurn.IsZero() condition would have returned execution to the calling
+	// function. In other words we will always be computing an effectiveFraction.
+	effectiveFraction := math.LegacyZeroDec()
 	if validator.Tokens.IsPositive() {
-		effectiveFraction := math.LegacyNewDecFromInt(tokensToBurn).QuoRoundUp(math.LegacyNewDecFromInt(validator.Tokens))
+		effectiveFraction = math.LegacyNewDecFromInt(tokensToBurn).QuoRoundUp(math.LegacyNewDecFromInt(validator.Tokens))
 		// possible if power has changed
 		if oneDec := math.LegacyOneDec(); effectiveFraction.GT(oneDec) {
 			effectiveFraction = oneDec
@@ -190,6 +194,16 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 		}
 	default:
 		panic("invalid validator status")
+	}
+
+	// Call the after-validator-slashed hook. Due to previous checks we are sure that tokensToBurn is positive i.e. that
+	// slashing occurred.
+	if err := k.Hooks().AfterValidatorSlashed(ctx, operatorAddress, effectiveFraction, tokensToBurn); err != nil {
+		// To maintain a general implementation in the staking module, the responsibility for halting chain
+		// execution is delegated to the individual modules that implement this hook. Errors are logged if they
+		// occur, as not all modules may require the chain to halt upon encountering an error. If a module needs to
+		// stop execution, it should explicitly trigger a panic within the logic of AfterValidatorSlashed.
+		k.Logger(ctx).Error("failed to call after after validator slashed hook", "error", err)
 	}
 
 	logger.Info(
