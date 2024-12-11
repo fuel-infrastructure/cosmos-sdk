@@ -140,10 +140,10 @@ func (h MultiStakingHooks) AfterRedelegationSlashed(
 }
 
 func (h MultiStakingHooks) AfterValidatorSlashed(
-	ctx context.Context, valAddr sdk.ValAddress, fraction sdkmath.LegacyDec, valSlashedAmt sdkmath.Int,
+	ctx context.Context, valAddr sdk.ValAddress, fraction sdkmath.LegacyDec, totalSlashedAmt sdkmath.Int,
 ) error {
 	for i := range h {
-		if err := h[i].AfterValidatorSlashed(ctx, valAddr, fraction, valSlashedAmt); err != nil {
+		if err := h[i].AfterValidatorSlashed(ctx, valAddr, fraction, totalSlashedAmt); err != nil {
 			return err
 		}
 	}
