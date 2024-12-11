@@ -174,6 +174,8 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 		if err := k.Hooks().BeforeValidatorSlashed(ctx, operatorAddress, effectiveFraction); err != nil {
 			k.Logger(ctx).Error("failed to call before validator slashed hook", "error", err)
 		}
+
+		// TODO: Add new hook specific to reports module here
 	}
 
 	// Deduct from validator's bonded tokens and update the validator.
