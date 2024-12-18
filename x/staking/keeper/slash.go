@@ -163,9 +163,8 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 	// note: validator.Tokens are always positive at this stage, otherwise, they would have caused tokensToBurn to be
 	// equal to zero and hence the tokensToBurn.IsZero() condition would have returned execution to the calling
 	// function. In other words we will always be computing an effectiveFraction.
-	effectiveFraction := math.LegacyZeroDec()
 	if validator.Tokens.IsPositive() {
-		effectiveFraction = math.LegacyNewDecFromInt(tokensToBurn).QuoRoundUp(math.LegacyNewDecFromInt(validator.Tokens))
+		effectiveFraction := math.LegacyNewDecFromInt(tokensToBurn).QuoRoundUp(math.LegacyNewDecFromInt(validator.Tokens))
 		// possible if power has changed
 		if oneDec := math.LegacyOneDec(); effectiveFraction.GT(oneDec) {
 			effectiveFraction = oneDec
@@ -175,7 +174,23 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 			k.Logger(ctx).Error("failed to call before validator slashed hook", "error", err)
 		}
 
-		// TODO: Add new hook specific to reports module here
+		// Call the custom-before-validator-slashed hook. Due to previous checks we are sure that tokensToBurn is
+		// positive i.e. that slashing will occur.
+		// Notes:
+		// 1. We are implementing a custom BeforeValidatorSlashedHook to make sure that if slashing occurs, the
+		// BeforeValidatorSlashed hook for the reports module will still be called. If the reports module made use
+		// of the standard BeforeValidatorSlashed hook and another module's BeforeValidatorSlashed hook errors,
+		// the reports module hook logic would be skipped.
+		// 2. The CustomBeforeValidatorSlashed should be used by Sequencer-native modules only.
+		if err := k.Hooks().CustomBeforeValidatorSlashed(
+			ctx, operatorAddress, effectiveFraction, tokensToBurn,
+		); err != nil {
+			// To maintain a general implementation in the staking module, the responsibility for halting chain
+			// execution is delegated to the individual modules that implement this hook. Errors are logged if they
+			// occur, as not all modules may require the chain to halt upon encountering an error. If a module needs to
+			// stop execution, it should explicitly trigger a panic within the logic of CustomBeforeValidatorSlashed.
+			k.Logger(ctx).Error("failed to call after validator slashed hook", "error", err)
+		}
 	}
 
 	// Deduct from validator's bonded tokens and update the validator.
@@ -196,16 +211,6 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 		}
 	default:
 		panic("invalid validator status")
-	}
-
-	// Call the after-validator-slashed hook. Due to previous checks we are sure that tokensToBurn is positive i.e. that
-	// slashing occurred.
-	if err := k.Hooks().AfterValidatorSlashed(ctx, operatorAddress, effectiveFraction, tokensToBurn); err != nil {
-		// To maintain a general implementation in the staking module, the responsibility for halting chain
-		// execution is delegated to the individual modules that implement this hook. Errors are logged if they
-		// occur, as not all modules may require the chain to halt upon encountering an error. If a module needs to
-		// stop execution, it should explicitly trigger a panic within the logic of AfterValidatorSlashed.
-		k.Logger(ctx).Error("failed to call after validator slashed hook", "error", err)
 	}
 
 	logger.Info(

@@ -117,7 +117,7 @@ type StakingHooks interface {
 	AfterRedelegationSlashed(
 		ctx context.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress, slashedAmount math.Int,
 	) error
-	AfterValidatorSlashed(
+	CustomBeforeValidatorSlashed(
 		ctx context.Context, valAddr sdk.ValAddress, fraction math.LegacyDec, totalSlashedAmt math.Int,
 	) error
 }

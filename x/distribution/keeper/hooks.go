@@ -189,6 +189,8 @@ func (h Hooks) AfterRedelegationSlashed(_ context.Context, _ sdk.ValAddress, _ s
 	return nil
 }
 
-func (h Hooks) AfterValidatorSlashed(_ context.Context, _ sdk.ValAddress, _ sdkmath.LegacyDec, _ sdkmath.Int) error {
+func (h Hooks) CustomBeforeValidatorSlashed(
+	_ context.Context, _ sdk.ValAddress, _ sdkmath.LegacyDec, _ sdkmath.Int,
+) error {
 	return nil
 }

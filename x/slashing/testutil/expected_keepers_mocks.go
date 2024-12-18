@@ -565,20 +565,6 @@ func (mr *MockStakingHooksMockRecorder) AfterValidatorRemoved(ctx, consAddr, val
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterValidatorRemoved", reflect.TypeOf((*MockStakingHooks)(nil).AfterValidatorRemoved), ctx, consAddr, valAddr)
 }
 
-// AfterValidatorSlashed mocks base method.
-func (m *MockStakingHooks) AfterValidatorSlashed(ctx context.Context, valAddr types.ValAddress, fraction math.LegacyDec, totalSlashedAmt math.Int) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AfterValidatorSlashed", ctx, valAddr, fraction, totalSlashedAmt)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AfterValidatorSlashed indicates an expected call of AfterValidatorSlashed.
-func (mr *MockStakingHooksMockRecorder) AfterValidatorSlashed(ctx, valAddr, fraction, totalSlashedAmt interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterValidatorSlashed", reflect.TypeOf((*MockStakingHooks)(nil).AfterValidatorSlashed), ctx, valAddr, fraction, totalSlashedAmt)
-}
-
 // BeforeDelegationCreated mocks base method.
 func (m *MockStakingHooks) BeforeDelegationCreated(ctx context.Context, delAddr types.AccAddress, valAddr types.ValAddress) error {
 	m.ctrl.T.Helper()
@@ -647,4 +633,18 @@ func (m *MockStakingHooks) BeforeValidatorSlashed(ctx context.Context, valAddr t
 func (mr *MockStakingHooksMockRecorder) BeforeValidatorSlashed(ctx, valAddr, fraction interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeforeValidatorSlashed", reflect.TypeOf((*MockStakingHooks)(nil).BeforeValidatorSlashed), ctx, valAddr, fraction)
+}
+
+// CustomBeforeValidatorSlashed mocks base method.
+func (m *MockStakingHooks) CustomBeforeValidatorSlashed(ctx context.Context, valAddr types.ValAddress, fraction math.LegacyDec, totalSlashedAmt math.Int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CustomBeforeValidatorSlashed", ctx, valAddr, fraction, totalSlashedAmt)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CustomBeforeValidatorSlashed indicates an expected call of CustomBeforeValidatorSlashed.
+func (mr *MockStakingHooksMockRecorder) CustomBeforeValidatorSlashed(ctx, valAddr, fraction, totalSlashedAmt interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CustomBeforeValidatorSlashed", reflect.TypeOf((*MockStakingHooks)(nil).CustomBeforeValidatorSlashed), ctx, valAddr, fraction, totalSlashedAmt)
 }
