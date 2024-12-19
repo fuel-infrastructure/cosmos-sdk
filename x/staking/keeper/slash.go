@@ -45,6 +45,12 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 	slashAmountDec := math.LegacyNewDecFromInt(amount).Mul(slashFactor)
 	slashAmount := slashAmountDec.TruncateInt()
 
+	sdkCtx.Logger().Warn("SLASH FUNCTION PART 1",
+		"slash_factor", slashFactor.String(), "amount", amount.String(),
+		"power", power, "height", infractionHeight,
+		"slash_amount", slashAmountDec.String(),
+	)
+
 	// ref https://github.com/cosmos/cosmos-sdk/issues/1348
 
 	validator, err := k.GetValidatorByConsAddr(ctx, consAddr)
@@ -86,6 +92,10 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 	// This will decrease when we slash unbondings and
 	// redelegations, as that stake has since unbonded
 	remainingSlashAmount := slashAmount
+
+	sdkCtx.Logger().Warn("SLASH FUNCTION PART 2",
+		"remainingSlashAmount", remainingSlashAmount.String(),
+	)
 
 	switch {
 	case infractionHeight > sdkCtx.BlockHeight():
@@ -144,6 +154,10 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 	// cannot decrease balance below zero
 	tokensToBurn := math.MinInt(remainingSlashAmount, validator.Tokens)
 	tokensToBurn = math.MaxInt(tokensToBurn, math.ZeroInt()) // defensive.
+
+	sdkCtx.Logger().Warn("SLASH FUNCTION PART 3",
+		"tokensToBurn", tokensToBurn.String(), "validator_tokens", validator.Tokens.String(),
+	)
 
 	if tokensToBurn.IsZero() {
 		// Nothing to burn, we can end this route immediately! We also don't
