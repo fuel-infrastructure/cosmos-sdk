@@ -189,6 +189,13 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 			k.Logger(ctx).Error("failed to call before validator slashed hook", "error", err)
 		}
 
+		// TODO: ADD NOTE
+		customFraction := math.LegacyNewDecFromInt(tokensToBurn).QuoRoundUp(math.LegacyNewDecFromInt(amount))
+		// possible if power has changed
+		if oneDec := math.LegacyOneDec(); customFraction.GT(oneDec) {
+			customFraction = oneDec
+		}
+
 		// Call the custom-before-validator-slashed hook. Due to previous checks we are sure that tokensToBurn is
 		// positive i.e. that slashing will occur.
 		//
@@ -199,7 +206,7 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 		// the reports module hook logic would be skipped.
 		// 2. The CustomBeforeValidatorSlashed should be used by Sequencer-native modules only.
 		if err := k.Hooks().CustomBeforeValidatorSlashed(
-			ctx, operatorAddress, effectiveFraction, tokensToBurn,
+			ctx, operatorAddress, customFraction, tokensToBurn,
 		); err != nil {
 			// To maintain a general implementation in the staking module, the responsibility for halting chain
 			// execution is delegated to the individual modules that implement this hook. Errors are logged if they
