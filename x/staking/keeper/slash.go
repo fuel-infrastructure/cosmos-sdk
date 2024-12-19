@@ -160,9 +160,10 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 	}
 
 	// we need to calculate the *effective* slash fraction for distribution
-	// note: validator.Tokens are always positive at this stage, otherwise, they would have caused tokensToBurn to be
-	// equal to zero and hence the tokensToBurn.IsZero() condition would have returned execution to the calling
-	// function. In other words we will always be computing an effectiveFraction.
+	//
+	// Note: `validator.Tokens` are always positive at this stage, otherwise, they would have caused tokensToBurn to be
+	// zero and hence the tokensToBurn.IsZero() condition would have returned execution to the calling function.
+	// In other words we will always be computing an effectiveFraction.
 	if validator.Tokens.IsPositive() {
 		effectiveFraction := math.LegacyNewDecFromInt(tokensToBurn).QuoRoundUp(math.LegacyNewDecFromInt(validator.Tokens))
 		// possible if power has changed
@@ -176,6 +177,7 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 
 		// Call the custom-before-validator-slashed hook. Due to previous checks we are sure that tokensToBurn is
 		// positive i.e. that slashing will occur.
+		//
 		// Notes:
 		// 1. We are implementing a custom BeforeValidatorSlashedHook to make sure that if slashing occurs, the
 		// BeforeValidatorSlashed hook for the reports module will still be called. If the reports module made use
@@ -316,8 +318,8 @@ func (k Keeper) SlashUnbondingDelegation(ctx context.Context, unbondingDelegatio
 	}
 
 	// Call the after-unbonding-delegation-slashed hook if the burned amount is greater than zero. The burned amount is
-	// used instead of the slashed amount because it represents the actual number of tokens that were slashed.
-	// In other words, if no tokens were burned, the unbonding delegation was not slashed.
+	// used instead of the slashed amount because it represents the actual number of tokens that were slashed. In other
+	// words, if no tokens were burned, the unbonding delegation was not slashed.
 	if burnedAmount.IsPositive() {
 		if err := k.Hooks().AfterUnbondingDelegationSlashed(
 			ctx, validatorAddress, delegatorAddress, burnedAmount,
@@ -462,7 +464,8 @@ func (k Keeper) SlashRedelegation(ctx context.Context, srcValidator types.Valida
 	// Call the after-redelegation-slashed hook if the sum of burned amounts is greater than zero. We are using the
 	// burned amounts instead of the slashed amount because it represents the actual number of tokens that were slashed.
 	// In other words, if no tokens were burned, the redelegation was not slashed.
-	// NOTE: In a redelegation we are actually slashing the validator receiving the redelegation, therefore, the valAddr
+	//
+	// Note: In a redelegation we are actually slashing the validator receiving the redelegation, therefore, the valAddr
 	// in the hook must be set to the dst validator.
 	burnedAmount := bondedBurnedAmount.Add(notBondedBurnedAmount)
 	if burnedAmount.IsPositive() {
