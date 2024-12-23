@@ -163,7 +163,7 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 	//
 	// Note: `validator.Tokens` are always positive at this stage, otherwise, they would have caused tokensToBurn to be
 	// zero and hence the tokensToBurn.IsZero() condition would have returned execution to the calling function.
-	// In other words we will always be computing an effectiveFraction.
+	// In other words we will always be computing an effectiveFraction, and it should never be zero or infinite.
 	if validator.Tokens.IsPositive() {
 		effectiveFraction := math.LegacyNewDecFromInt(tokensToBurn).QuoRoundUp(math.LegacyNewDecFromInt(validator.Tokens))
 		// possible if power has changed
@@ -180,9 +180,9 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 		//
 		// Notes:
 		// 1. We are implementing a custom BeforeValidatorSlashedHook to make sure that if slashing occurs, the
-		// BeforeValidatorSlashed hook for the reports module will still be called. If the reports module made use
-		// of the standard BeforeValidatorSlashed hook and another module's BeforeValidatorSlashed hook errors,
-		// the reports module hook logic would be skipped.
+		// (Custom)BeforeValidatorSlashed hook for the reports module will still be called. If the reports module made
+		// use of the standard BeforeValidatorSlashed hook and another module's BeforeValidatorSlashed hook errored,
+		// the reports module hook logic would be skipped because of how the error handling is implemented above.
 		// 2. The CustomBeforeValidatorSlashed should be used by Sequencer-native modules only.
 		if err := k.Hooks().CustomBeforeValidatorSlashed(
 			ctx, operatorAddress, effectiveFraction, tokensToBurn,
