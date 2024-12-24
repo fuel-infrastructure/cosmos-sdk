@@ -267,15 +267,17 @@ func GenesisStateWithValSet(
 		totalSupply = totalSupply.Add(b.Coins...)
 	}
 
+	totalDelegated := sdk.NewCoins()
 	for range delegations {
 		// add delegated tokens to total supply
 		totalSupply = totalSupply.Add(sdk.NewCoin(sdk.DefaultBondDenom, bondAmt))
+		totalDelegated = totalDelegated.Add(sdk.NewCoin(sdk.DefaultBondDenom, bondAmt))
 	}
 
 	// add bonded amount to bonded pool module account
 	balances = append(balances, banktypes.Balance{
 		Address: authtypes.NewModuleAddress(stakingtypes.BondedPoolName).String(),
-		Coins:   sdk.Coins{sdk.NewCoin(sdk.DefaultBondDenom, bondAmt)},
+		Coins:   totalDelegated,
 	})
 
 	// update total supply
