@@ -42,7 +42,8 @@ func (k Keeper) notBondedTokensToBonded(ctx context.Context, tokens math.Int) er
 	return k.bankKeeper.SendCoinsFromModuleToModule(ctx, types.NotBondedPoolName, types.BondedPoolName, coins)
 }
 
-// burnBondedTokens burns coins from the bonded pool module account
+// burnBondedTokens transfers coins from the bonded pool module account to the governance module account.
+// This is to avoid burning tokens and instead make them controllable by governance.
 func (k Keeper) burnBondedTokens(ctx context.Context, amt math.Int) error {
 	if !amt.IsPositive() {
 		// skip as no coins need to be burned
@@ -59,7 +60,8 @@ func (k Keeper) burnBondedTokens(ctx context.Context, amt math.Int) error {
 	return k.bankKeeper.SendCoinsFromModuleToModule(ctx, types.BondedPoolName, govtypes.ModuleName, coins)
 }
 
-// burnNotBondedTokens burns coins from the not bonded pool module account
+// burnNotBondedTokens transfers coins from the not bonded pool module account to the governance module account.
+// This is to avoid burning tokens and instead make them controllable by governance.
 func (k Keeper) burnNotBondedTokens(ctx context.Context, amt math.Int) error {
 	if !amt.IsPositive() {
 		// skip as no coins need to be burned
