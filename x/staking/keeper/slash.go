@@ -180,10 +180,8 @@ func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, infractionH
 		// positive i.e. that slashing will occur.
 		//
 		// Notes:
-		// 1. We are implementing a custom BeforeValidatorSlashedHook to make sure that if slashing occurs, the
-		// (Custom)BeforeValidatorSlashed hook for the reports module will still be called. If the reports module made
-		// use of the standard BeforeValidatorSlashed hook and another module's BeforeValidatorSlashed hook errored,
-		// the reports module hook logic would be skipped because of how the error handling is implemented above.
+		// 1. We implemented a custom BeforeValidatorSlashedHook to make sure that if slashing occurs, the custom hook
+		// for the reports module will be called, with tokensToBurn included so that we can perform extra checks.
 		// 2. The CustomBeforeValidatorSlashed should be used by Sequencer-native modules only.
 		if err := k.Hooks().CustomBeforeValidatorSlashed(
 			ctx, operatorAddress, effectiveFraction, tokensToBurn,
