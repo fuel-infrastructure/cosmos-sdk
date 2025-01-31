@@ -1,4 +1,4 @@
-module cosmossdk.io/x/distribution
+module fuelsequencer.io/x/distribution
 
 go 1.23.4
 

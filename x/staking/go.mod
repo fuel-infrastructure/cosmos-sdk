@@ -1,4 +1,4 @@
-module cosmossdk.io/x/staking
+module fuelsequencer.io/x/staking
 
 go 1.23.4
 
