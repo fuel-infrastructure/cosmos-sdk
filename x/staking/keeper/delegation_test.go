@@ -63,9 +63,9 @@ func (s *KeeperTestSuite) TestDelegation() {
 
 	getAllFromIterateValidatorDelegations := func(valAddr sdk.ValAddress) []stakingtypes.Delegation {
 		var delegations []stakingtypes.Delegation
-		err := keeper.IterateValidatorDelegations(ctx, valAddr, func(delegation stakingtypes.Delegation) (stop bool) {
+		err := keeper.IterateValidatorDelegations(ctx, valAddr, func(delegation stakingtypes.Delegation) (stop bool, err error) {
 			delegations = append(delegations, delegation)
-			return false
+			return false, nil
 		})
 		require.NoError(err)
 		return delegations
