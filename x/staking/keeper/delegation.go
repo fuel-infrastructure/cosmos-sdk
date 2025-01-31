@@ -55,6 +55,34 @@ func (k Keeper) GetValidatorDelegations(ctx context.Context, valAddr sdk.ValAddr
 	return delegations, nil
 }
 
+// GetDelegation gets a delegation
+// NOTE: This is a custom function
+func (k Keeper) GetDelegation(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (types.Delegation, error) {
+	return k.Delegations.Get(ctx, collections.Join(delAddr, valAddr))
+}
+
+// IterateValidatorDelegations iterates through all validator delegations.
+// NOTE: This is a custom function
+func (k Keeper) IterateValidatorDelegations(
+	ctx context.Context, valAddr sdk.ValAddress, cb func(delegation types.Delegation) (stop bool, err error),
+) error {
+	rng := collections.NewPrefixedPairRange[sdk.ValAddress, sdk.AccAddress](valAddr)
+	err := k.DelegationsByValidator.Walk(ctx, rng, func(key collections.Pair[sdk.ValAddress, sdk.AccAddress], _ []byte) (stop bool, err error) {
+		valAddr, delAddr := key.K1(), key.K2()
+		delegation, err := k.Delegations.Get(ctx, collections.Join(delAddr, valAddr))
+		if err != nil {
+			return true, err
+		}
+
+		return cb(delegation)
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // GetDelegatorDelegations returns a given amount of all the delegations from a
 // delegator.
 func (k Keeper) GetDelegatorDelegations(ctx context.Context, delegator sdk.AccAddress, maxRetrieve uint16) ([]types.Delegation, error) {

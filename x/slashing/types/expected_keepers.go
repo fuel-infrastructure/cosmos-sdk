@@ -72,4 +72,15 @@ type StakingHooks interface {
 	BeforeDelegationRemoved(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error        // Must be called when a delegation is removed
 	AfterDelegationModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error
 	BeforeValidatorSlashed(ctx context.Context, valAddr sdk.ValAddress, fraction math.LegacyDec) error
+
+	// These are custom hooks
+	AfterUnbondingDelegationSlashed(
+		ctx context.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress, slashedAmount math.Int,
+	) error
+	AfterRedelegationSlashed(
+		ctx context.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress, slashedAmount math.Int,
+	) error
+	CustomBeforeValidatorSlashed(
+		ctx context.Context, valAddr sdk.ValAddress, fraction math.LegacyDec, totalSlashedAmt math.Int,
+	) error
 }

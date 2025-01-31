@@ -190,7 +190,8 @@ func (k msgServer) Burn(ctx context.Context, msg *types.MsgBurn) (*types.MsgBurn
 		return nil, errorsmod.Wrap(sdkerrors.ErrInvalidCoins, coins.String())
 	}
 
-	err = k.BurnCoins(ctx, from, coins)
+	// Tokens are not actually burned. They are sent to the governance module account.
+	err = k.SendCoinsFromAccountToModule(ctx, from, types.GovModuleName, coins)
 	if err != nil {
 		return nil, err
 	}

@@ -424,7 +424,7 @@ func (suite *KeeperTestSuite) TestMsgBurn() {
 			err := suite.bankKeeper.MintCoins(suite.ctx, multiPermAcc.Name, sdk.Coins{}.Add(origCoins))
 			suite.Require().NoError(err)
 			if !tc.expErr {
-				suite.mockBurnCoins(multiPermAcc)
+				suite.mockSendCoinsFromAccountToModule(multiPermAcc.BaseAccount, govAcc)
 			}
 			_, err = suite.msgServer.Burn(suite.ctx, tc.input)
 			if tc.expErr {

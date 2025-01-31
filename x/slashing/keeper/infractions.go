@@ -166,7 +166,7 @@ func (k Keeper) HandleValidatorSignatureWithParams(ctx context.Context, params t
 				event.NewAttribute(types.AttributeKeyPower, fmt.Sprintf("%d", power)),
 				event.NewAttribute(types.AttributeKeyReason, types.AttributeValueMissingSignature),
 				event.NewAttribute(types.AttributeKeyJailed, consStr),
-				event.NewAttribute(types.AttributeKeyBurnedCoins, coinsBurned.String()),
+				event.NewAttribute(types.AttributeKeySlashedCoins, coinsBurned.String()),
 			); err != nil {
 				return err
 			}
