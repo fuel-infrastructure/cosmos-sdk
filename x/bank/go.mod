@@ -1,4 +1,4 @@
-module fuelsequencer.io/x/bank
+module cosmossdk.io/x/bank
 
 go 1.23.4
 

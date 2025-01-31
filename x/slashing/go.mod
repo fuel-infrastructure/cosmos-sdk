@@ -1,4 +1,4 @@
-module fuelsequencer.io/x/slashing
+module cosmossdk.io/x/slashing
 
 go 1.23.4
 
