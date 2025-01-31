@@ -55,6 +55,12 @@ func (k Keeper) GetValidatorDelegations(ctx context.Context, valAddr sdk.ValAddr
 	return delegations, nil
 }
 
+// GetDelegation gets a delegation
+// NOTE: This is a custom function
+func (k Keeper) GetDelegation(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (types.Delegation, error) {
+	return k.Delegations.Get(ctx, collections.Join(delAddr, valAddr))
+}
+
 // IterateValidatorDelegations iterates through all validator delegations.
 // NOTE: This is a custom function
 func (k Keeper) IterateValidatorDelegations(
