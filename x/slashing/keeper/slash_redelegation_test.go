@@ -15,9 +15,13 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
 	distributionkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
+	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 	"github.com/cosmos/cosmos-sdk/x/slashing/testutil"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
@@ -30,17 +34,22 @@ func TestSlashRedelegation(t *testing.T) {
 	var bankKeeper bankkeeper.Keeper
 	var slashKeeper slashingkeeper.Keeper
 	var distrKeeper distributionkeeper.Keeper
+	var govKeeper *govkeeper.Keeper
 
 	app, err := simtestutil.Setup(depinject.Configs(
 		depinject.Supply(log.NewNopLogger()),
 		testutil.AppConfig,
-	), &stakingKeeper, &bankKeeper, &slashKeeper, &distrKeeper)
+	), &stakingKeeper, &bankKeeper, &slashKeeper, &distrKeeper, &govKeeper)
 	require.NoError(t, err)
 
 	// get sdk context, staking msg server and bond denom
 	ctx := app.BaseApp.NewContext(false)
 	stakingMsgServer := stakingkeeper.NewMsgServerImpl(stakingKeeper)
 	bondDenom, err := stakingKeeper.BondDenom(ctx)
+	require.NoError(t, err)
+
+	// Initialize governance module account
+	err = govKeeper.Params.Set(ctx, govv1.DefaultParams())
 	require.NoError(t, err)
 
 	// evilVal will be slashed, goodVal won't be slashed
@@ -131,6 +140,9 @@ func TestSlashRedelegation(t *testing.T) {
 	ctx, err = simtestutil.NextBlock(app, ctx, time.Duration(1))
 	require.NoError(t, err)
 
+	// Get governance module account balance before slashing
+	govBalanceBefore := bankKeeper.GetBalance(ctx, authtypes.NewModuleAddress(govtypes.ModuleName), bondDenom)
+
 	// slash evil val with slash factor = 0.9, leaving only 10% of stake after slashing
 	evilVal, _ = stakingKeeper.GetValidator(ctx, evilValAddr)
 	evilValConsAddr, err := evilVal.GetConsAddr()
@@ -160,6 +172,14 @@ func TestSlashRedelegation(t *testing.T) {
 	balance1AfterSlashing := bankKeeper.GetBalance(ctx, testAcc1, bondDenom)
 	balance2AfterSlashing := bankKeeper.GetBalance(ctx, testAcc2, bondDenom)
 
-	require.Equal(t, balance1AfterSlashing.Amount.Mul(math.NewIntFromUint64(10)).String(), balance1Before.Amount.String())
-	require.Equal(t, balance2AfterSlashing.Amount.Mul(math.NewIntFromUint64(10)).String(), balance2Before.Amount.String())
+	// Calculate expected balances after slashing (10% of original balance)
+	expectedBalanceAfterSlashing := balance1Before.Amount.Mul(math.NewIntFromUint64(1)).Quo(math.NewIntFromUint64(10))
+	require.Equal(t, balance1AfterSlashing.Amount.String(), expectedBalanceAfterSlashing.String())
+	require.Equal(t, balance2AfterSlashing.Amount.String(), expectedBalanceAfterSlashing.String())
+
+	// Check that slashed tokens were transferred to governance module account
+	govBalanceAfter := bankKeeper.GetBalance(ctx, authtypes.NewModuleAddress(govtypes.ModuleName), bondDenom)
+	// Calculate expected slashed amount (90% of total delegated amount)
+	expectedSlashedAmount := balance1Before.Amount.Add(balance2Before.Amount).Add(testCoins[0].Amount).Mul(math.NewIntFromUint64(9)).Quo(math.NewIntFromUint64(10))
+	require.Equal(t, govBalanceAfter.Amount.Sub(govBalanceBefore.Amount).String(), expectedSlashedAmount.String())
 }

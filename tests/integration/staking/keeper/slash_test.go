@@ -13,6 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec/address"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	"github.com/cosmos/cosmos-sdk/x/staking/testutil"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -66,7 +67,7 @@ func TestSlashUnbondingDelegation(t *testing.T) {
 
 	assert.NilError(t, f.stakingKeeper.SetUnbondingDelegation(f.sdkCtx, ubd))
 
-	// unbonding started prior to the infraction height, stakw didn't contribute
+	// unbonding started prior to the infraction height, stake didn't contribute
 	slashAmount, err := f.stakingKeeper.SlashUnbondingDelegation(f.sdkCtx, ubd, 1, fraction)
 	assert.NilError(t, err)
 	assert.Assert(t, slashAmount.Equal(math.NewInt(0)))
@@ -85,7 +86,8 @@ func TestSlashUnbondingDelegation(t *testing.T) {
 	assert.NilError(t, f.stakingKeeper.SetUnbondingDelegation(f.sdkCtx, ubd))
 	slashAmount, err = f.stakingKeeper.SlashUnbondingDelegation(f.sdkCtx, ubd, 0, fraction)
 	assert.NilError(t, err)
-	assert.Assert(t, slashAmount.Equal(math.NewInt(5)))
+	expectedSlashAmount := fraction.MulInt(ubd.Entries[0].InitialBalance).TruncateInt()
+	assert.Assert(t, slashAmount.Equal(expectedSlashAmount))
 	ubd, found := f.stakingKeeper.GetUnbondingDelegation(f.sdkCtx, addrDels[0], addrVals[0])
 	assert.Assert(t, found)
 	assert.Assert(t, len(ubd.Entries) == 1)
@@ -94,12 +96,13 @@ func TestSlashUnbondingDelegation(t *testing.T) {
 	assert.DeepEqual(t, math.NewInt(10), ubd.Entries[0].InitialBalance)
 
 	// balance decreased
-	assert.DeepEqual(t, math.NewInt(5), ubd.Entries[0].Balance)
+	expectedBalance := ubd.Entries[0].InitialBalance.Sub(expectedSlashAmount)
+	assert.DeepEqual(t, expectedBalance, ubd.Entries[0].Balance)
 	newUnbondedPoolBalances := f.bankKeeper.GetAllBalances(f.sdkCtx, notBondedPool.GetAddress())
 	diffTokens := oldUnbondedPoolBalances.Sub(newUnbondedPoolBalances...)
 	bondDenom, err := f.stakingKeeper.BondDenom(f.sdkCtx)
 	assert.NilError(t, err)
-	assert.Assert(t, diffTokens.AmountOf(bondDenom).Equal(math.NewInt(5)))
+	assert.Assert(t, diffTokens.AmountOf(bondDenom).Equal(expectedSlashAmount))
 }
 
 // tests slashRedelegation
@@ -154,7 +157,8 @@ func TestSlashRedelegation(t *testing.T) {
 	assert.Assert(t, found)
 	slashAmount, err = f.stakingKeeper.SlashRedelegation(f.sdkCtx, validator, rd, 0, fraction)
 	assert.NilError(t, err)
-	assert.Assert(t, slashAmount.Equal(math.NewInt(5)))
+	expectedSlashAmount := fraction.MulInt(rd.Entries[0].InitialBalance).TruncateInt()
+	assert.Assert(t, slashAmount.Equal(expectedSlashAmount))
 	rd, found = f.stakingKeeper.GetRedelegation(f.sdkCtx, addrDels[0], addrVals[0], addrVals[1])
 	assert.Assert(t, found)
 	assert.Assert(t, len(rd.Entries) == 1)
@@ -168,10 +172,11 @@ func TestSlashRedelegation(t *testing.T) {
 	// shares decreased
 	del, found = f.stakingKeeper.GetDelegation(f.sdkCtx, addrDels[0], addrVals[1])
 	assert.Assert(t, found)
-	assert.Equal(t, int64(5), del.Shares.RoundInt64())
+	expectedShares := math.LegacyNewDecFromInt(rd.Entries[0].InitialBalance.Sub(expectedSlashAmount))
+	assert.Equal(t, expectedShares.RoundInt64(), del.Shares.RoundInt64())
 
 	// pool bonded tokens should decrease
-	burnedCoins := sdk.NewCoins(sdk.NewCoin(bondDenom, slashAmount))
+	burnedCoins := sdk.NewCoins(sdk.NewCoin(bondDenom, expectedSlashAmount))
 	assert.DeepEqual(t, balances.Sub(burnedCoins...), f.bankKeeper.GetAllBalances(f.sdkCtx, bondedPool.GetAddress()))
 }
 
@@ -182,12 +187,19 @@ func TestSlashAtNegativeHeight(t *testing.T) {
 	consAddr := sdk.ConsAddress(PKs[0].Address())
 	fraction := math.LegacyNewDecWithPrec(5, 1)
 
+	bondDenom, err := f.stakingKeeper.BondDenom(f.sdkCtx)
+	assert.NilError(t, err)
+
 	bondedPool := f.stakingKeeper.GetBondedPool(f.sdkCtx)
 	oldBondedPoolBalances := f.bankKeeper.GetAllBalances(f.sdkCtx, bondedPool.GetAddress())
 
+	// Get governance module account balance before slashing
+	govModuleAddr := f.accountKeeper.GetModuleAddress(govtypes.ModuleName)
+	govBalanceBefore := f.bankKeeper.GetBalance(f.sdkCtx, govModuleAddr, bondDenom)
+
 	_, found := f.stakingKeeper.GetValidatorByConsAddr(f.sdkCtx, consAddr)
 	assert.Assert(t, found)
-	_, err := f.stakingKeeper.Slash(f.sdkCtx, consAddr, -2, 10, fraction)
+	_, err = f.stakingKeeper.Slash(f.sdkCtx, consAddr, -2, 10, fraction)
 	assert.NilError(t, err)
 
 	// read updated state
@@ -203,15 +215,19 @@ func TestSlashAtNegativeHeight(t *testing.T) {
 	validator, found = f.stakingKeeper.GetValidator(f.sdkCtx, valbz)
 	assert.Assert(t, found)
 	// power decreased
-	assert.Equal(t, int64(5), validator.GetConsensusPower(f.stakingKeeper.PowerReduction(f.sdkCtx)))
+	expectedPower := int64(5) // 10 * (1 - 0.5)
+	assert.Equal(t, expectedPower, validator.GetConsensusPower(f.stakingKeeper.PowerReduction(f.sdkCtx)))
 
-	bondDenom, err := f.stakingKeeper.BondDenom(f.sdkCtx)
-	assert.NilError(t, err)
-
+	// assert that the amount of tokens burned (transferred to gov module account) is equal to the amount of tokens slashed
+	expectedSlashedAmount := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 5)
 	// pool bonded shares decreased
 	newBondedPoolBalances := f.bankKeeper.GetAllBalances(f.sdkCtx, bondedPool.GetAddress())
 	diffTokens := oldBondedPoolBalances.Sub(newBondedPoolBalances...).AmountOf(bondDenom)
-	assert.DeepEqual(t, f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 5).String(), diffTokens.String())
+	assert.DeepEqual(t, expectedSlashedAmount.String(), diffTokens.String())
+
+	// Check that slashed tokens were transferred to governance module account
+	govBalanceAfter := f.bankKeeper.GetBalance(f.sdkCtx, govModuleAddr, bondDenom)
+	assert.DeepEqual(t, govBalanceAfter.Amount.Sub(govBalanceBefore.Amount).String(), expectedSlashedAmount.String())
 }
 
 // tests Slash at the current height
@@ -225,6 +241,10 @@ func TestSlashValidatorAtCurrentHeight(t *testing.T) {
 
 	bondedPool := f.stakingKeeper.GetBondedPool(f.sdkCtx)
 	oldBondedPoolBalances := f.bankKeeper.GetAllBalances(f.sdkCtx, bondedPool.GetAddress())
+
+	// Get governance module account balance before slashing
+	govModuleAddr := f.accountKeeper.GetModuleAddress(govtypes.ModuleName)
+	govBalanceBefore := f.bankKeeper.GetBalance(f.sdkCtx, govModuleAddr, bondDenom)
 
 	_, found := f.stakingKeeper.GetValidatorByConsAddr(f.sdkCtx, consAddr)
 	assert.Assert(t, found)
@@ -244,12 +264,19 @@ func TestSlashValidatorAtCurrentHeight(t *testing.T) {
 	validator, found = f.stakingKeeper.GetValidator(f.sdkCtx, valbz)
 	assert.Assert(t, found)
 	// power decreased
-	assert.Equal(t, int64(5), validator.GetConsensusPower(f.stakingKeeper.PowerReduction(f.sdkCtx)))
+	expectedPower := int64(5) // 10 * (1 - 0.5)
+	assert.Equal(t, expectedPower, validator.GetConsensusPower(f.stakingKeeper.PowerReduction(f.sdkCtx)))
 
+	// assert that the amount of tokens burned (transferred to gov module account) is equal to the amount of tokens slashed
+	expectedSlashedAmount := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 5)
 	// pool bonded shares decreased
 	newBondedPoolBalances := f.bankKeeper.GetAllBalances(f.sdkCtx, bondedPool.GetAddress())
 	diffTokens := oldBondedPoolBalances.Sub(newBondedPoolBalances...).AmountOf(bondDenom)
-	assert.DeepEqual(t, f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 5).String(), diffTokens.String())
+	assert.DeepEqual(t, expectedSlashedAmount.String(), diffTokens.String())
+
+	// Check that slashed tokens were transferred to governance module account
+	govBalanceAfter := f.bankKeeper.GetBalance(f.sdkCtx, govModuleAddr, bondDenom)
+	assert.DeepEqual(t, govBalanceAfter.Amount.Sub(govBalanceBefore.Amount).String(), expectedSlashedAmount.String())
 }
 
 // tests Slash at a previous height with an unbonding delegation

@@ -13,6 +13,7 @@ import (
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	"github.com/cosmos/cosmos-sdk/x/staking/testutil"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -139,6 +140,10 @@ func TestSlashToZeroPowerRemoved(t *testing.T) {
 
 	f.accountKeeper.SetModuleAccount(f.sdkCtx, bondedPool)
 
+	// Get governance module account balance before slashing
+	govModuleAddr := f.accountKeeper.GetModuleAddress(govtypes.ModuleName)
+	govBalanceBefore := f.bankKeeper.GetBalance(f.sdkCtx, govModuleAddr, bondDenom)
+
 	validator, _ = validator.AddTokensFromDel(valTokens)
 	assert.Equal(t, types.Unbonded, validator.Status)
 	assert.DeepEqual(t, valTokens, validator.Tokens)
@@ -148,6 +153,11 @@ func TestSlashToZeroPowerRemoved(t *testing.T) {
 
 	// slash the validator by 100%
 	f.stakingKeeper.Slash(f.sdkCtx, sdk.ConsAddress(PKs[0].Address()), 0, 100, math.LegacyOneDec())
+
+	// Check that slashed tokens were transferred to governance module account
+	govBalanceAfter := f.bankKeeper.GetBalance(f.sdkCtx, govModuleAddr, bondDenom)
+	assert.DeepEqual(t, govBalanceAfter.Amount.Sub(govBalanceBefore.Amount).String(), valTokens.String())
+
 	// apply TM updates
 	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, -1)
 	// validator should be unbonding

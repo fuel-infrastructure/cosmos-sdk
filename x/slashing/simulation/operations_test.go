@@ -28,6 +28,7 @@ import (
 	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
 	distributionkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
@@ -56,6 +57,7 @@ type SimTestSuite struct {
 	slashingKeeper    slashingkeeper.Keeper
 	distrKeeper       distributionkeeper.Keeper
 	mintKeeper        mintkeeper.Keeper
+	govKeeper         govkeeper.Keeper
 }
 
 func (suite *SimTestSuite) SetupTest() {
@@ -95,6 +97,7 @@ func (suite *SimTestSuite) SetupTest() {
 		&suite.mintKeeper,
 		&suite.slashingKeeper,
 		&suite.distrKeeper,
+		&suite.govKeeper,
 	)
 
 	suite.Require().NoError(err)

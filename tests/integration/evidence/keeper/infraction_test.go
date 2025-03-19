@@ -37,6 +37,7 @@ import (
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"github.com/cosmos/cosmos-sdk/x/slashing"
@@ -77,6 +78,7 @@ type fixture struct {
 	evidenceKeeper *keeper.Keeper
 	slashingKeeper slashingkeeper.Keeper
 	stakingKeeper  *stakingkeeper.Keeper
+	accountKeeper  authkeeper.AccountKeeper
 }
 
 func initFixture(t testing.TB) *fixture {
@@ -96,6 +98,7 @@ func initFixture(t testing.TB) *fixture {
 		minttypes.ModuleName:           {authtypes.Minter},
 		stakingtypes.BondedPoolName:    {authtypes.Burner, authtypes.Staking},
 		stakingtypes.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
+		govtypes.ModuleName:            {authtypes.Burner, authtypes.Staking},
 	}
 
 	accountKeeper := authkeeper.NewAccountKeeper(
@@ -162,6 +165,7 @@ func initFixture(t testing.TB) *fixture {
 		evidenceKeeper: evidenceKeeper,
 		slashingKeeper: slashingKeeper,
 		stakingKeeper:  stakingKeeper,
+		accountKeeper:  accountKeeper,
 	}
 }
 
@@ -204,6 +208,12 @@ func TestHandleDoubleSign(t *testing.T) {
 	assert.NilError(t, err)
 	oldTokens := val.GetTokens()
 
+	// Get governance module account balance before slashing
+	govModuleAddr := f.accountKeeper.GetModuleAddress(govtypes.ModuleName)
+	bondDenom, err := f.stakingKeeper.BondDenom(ctx)
+	assert.NilError(t, err)
+	govBalanceBefore := f.bankKeeper.GetBalance(ctx, govModuleAddr, bondDenom)
+
 	nci := NewCometInfo(abci.RequestFinalizeBlock{
 		Misbehavior: []abci.Misbehavior{{
 			Validator: abci.Validator{Address: valpubkey.Address(), Power: power},
@@ -225,6 +235,11 @@ func TestHandleDoubleSign(t *testing.T) {
 	// tokens should be decreased
 	newTokens := val.GetTokens()
 	assert.Assert(t, newTokens.LT(oldTokens))
+
+	// Check that slashed tokens were transferred to governance module account
+	govBalanceAfter := f.bankKeeper.GetBalance(ctx, govModuleAddr, bondDenom)
+	slashedAmount := oldTokens.Sub(newTokens)
+	assert.DeepEqual(t, govBalanceAfter.Amount.Sub(govBalanceBefore.Amount).String(), slashedAmount.String())
 
 	// submit duplicate evidence
 	assert.NilError(t, f.evidenceKeeper.BeginBlocker(ctx))
