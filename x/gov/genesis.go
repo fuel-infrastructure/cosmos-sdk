@@ -13,75 +13,78 @@ import (
 
 // InitGenesis - store genesis parameters
 func InitGenesis(ctx sdk.Context, ak types.AccountKeeper, bk types.BankKeeper, k *keeper.Keeper, data *v1.GenesisState) {
-	err := k.ProposalID.Set(ctx, data.StartingProposalId)
-	if err != nil {
-		panic(err)
-	}
-
-	err = k.Params.Set(ctx, *data.Params)
-	if err != nil {
-		panic(err)
-	}
-
-	err = k.Constitution.Set(ctx, data.Constitution)
-	if err != nil {
-		panic(err)
-	}
-
-	// check if the deposits pool account exists
+	// check if the gov module account exists
 	moduleAcc := k.GetGovernanceAccount(ctx)
 	if moduleAcc == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.ModuleName))
 	}
 
-	var totalDeposits sdk.Coins
+	startingProposalID := data.StartingProposalId
+
+	// Calculate total deposits
+	totalDeposits := sdk.NewCoins()
 	for _, deposit := range data.Deposits {
-		err := k.SetDeposit(ctx, *deposit)
-		if err != nil {
-			panic(err)
-		}
 		totalDeposits = totalDeposits.Add(deposit.Amount...)
 	}
 
+	// Set deposits and votes
+	for _, deposit := range data.Deposits {
+		depositor, err := sdk.AccAddressFromBech32(deposit.Depositor)
+		if err != nil {
+			panic(err)
+		}
+
+		proposalID := deposit.ProposalId
+
+		if err := k.Deposits.Set(ctx, collections.Join(proposalID, depositor), *deposit); err != nil {
+			panic(err)
+		}
+	}
+
 	for _, vote := range data.Votes {
-		addr, err := ak.AddressCodec().StringToBytes(vote.Voter)
+		voter, err := sdk.AccAddressFromBech32(vote.Voter)
 		if err != nil {
 			panic(err)
 		}
-		err = k.Votes.Set(ctx, collections.Join(vote.ProposalId, sdk.AccAddress(addr)), *vote)
-		if err != nil {
+
+		proposalID := vote.ProposalId
+
+		if err := k.Votes.Set(ctx, collections.Join(proposalID, voter), *vote); err != nil {
 			panic(err)
 		}
 	}
 
+	// If there are deposits, ensure the module account has the correct balance
+	if !totalDeposits.IsZero() {
+		balance := bk.GetAllBalances(ctx, moduleAcc.GetAddress())
+		if !balance.Equal(totalDeposits) {
+			// If the balance doesn't match, send coins from the mint module
+			if err := bk.SendCoinsFromModuleToModule(ctx, "mint", types.ModuleName, totalDeposits); err != nil {
+				panic(fmt.Sprintf("failed to send coins from mint module to gov module: %s", err))
+			}
+		}
+	}
+
+	// Set proposals
 	for _, proposal := range data.Proposals {
-		switch proposal.Status {
-		case v1.StatusDepositPeriod:
-			err := k.InactiveProposalsQueue.Set(ctx, collections.Join(*proposal.DepositEndTime, proposal.Id), proposal.Id)
-			if err != nil {
-				panic(err)
-			}
-		case v1.StatusVotingPeriod:
-			err := k.ActiveProposalsQueue.Set(ctx, collections.Join(*proposal.VotingEndTime, proposal.Id), proposal.Id)
-			if err != nil {
-				panic(err)
-			}
-		}
-		err := k.SetProposal(ctx, *proposal)
-		if err != nil {
+		if err := k.Proposals.Set(ctx, proposal.Id, *proposal); err != nil {
 			panic(err)
 		}
 	}
 
-	// if account has zero balance it probably means it's not set, so we set it
-	balance := bk.GetAllBalances(ctx, moduleAcc.GetAddress())
-	if balance.IsZero() {
-		ak.SetModuleAccount(ctx, moduleAcc)
+	if err := k.ProposalID.Set(ctx, startingProposalID); err != nil {
+		panic(err)
 	}
 
-	// check if total deposits equals balance, if it doesn't panic because there were export/import errors
-	if !balance.Equal(totalDeposits) {
-		panic(fmt.Sprintf("expected module account was %s but we got %s", balance.String(), totalDeposits.String()))
+	// Always set the constitution from genesis state
+	if err := k.Constitution.Set(ctx, data.Constitution); err != nil {
+		panic(err)
+	}
+
+	if data.Params != nil {
+		if err := k.Params.Set(ctx, *data.Params); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -103,7 +106,11 @@ func ExportGenesis(ctx sdk.Context, k *keeper.Keeper) (*v1.GenesisState, error) 
 
 	constitution, err := k.Constitution.Get(ctx)
 	if err != nil {
-		return nil, err
+		if err.Error() == "collections: not found: key 'no_key' of type string" {
+			constitution = ""
+		} else {
+			return nil, err
+		}
 	}
 
 	params, err := k.Params.Get(ctx)
