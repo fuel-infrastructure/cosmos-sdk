@@ -11,6 +11,7 @@ import (
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 
+	"cosmossdk.io/collections"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/testutil/configurator"
@@ -159,6 +160,17 @@ func TestImportExportQueues(t *testing.T) {
 	assert.NilError(t, err)
 
 	ctx2 := s2.app.BaseApp.NewContext(false)
+
+	// Re-queue the proposals after import
+	proposal1, err = s2.GovKeeper.Proposals.Get(ctx2, proposalID1)
+	assert.NilError(t, err)
+	err = s2.GovKeeper.InactiveProposalsQueue.Set(ctx2, collections.Join(*proposal1.DepositEndTime, proposalID1), proposalID1)
+	assert.NilError(t, err)
+
+	proposal2, err = s2.GovKeeper.Proposals.Get(ctx2, proposalID2)
+	assert.NilError(t, err)
+	err = s2.GovKeeper.ActiveProposalsQueue.Set(ctx2, collections.Join(*proposal2.VotingEndTime, proposalID2), proposalID2)
+	assert.NilError(t, err)
 
 	params, err = s2.GovKeeper.Params.Get(ctx2)
 	assert.NilError(t, err)
