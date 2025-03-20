@@ -24,17 +24,17 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
 	distributionkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
-	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 	"github.com/cosmos/cosmos-sdk/x/slashing/simulation"
 	"github.com/cosmos/cosmos-sdk/x/slashing/testutil"
-	"github.com/cosmos/cosmos-sdk/x/slashing/types"
+	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
@@ -57,7 +57,6 @@ type SimTestSuite struct {
 	slashingKeeper    slashingkeeper.Keeper
 	distrKeeper       distributionkeeper.Keeper
 	mintKeeper        mintkeeper.Keeper
-	govKeeper         govkeeper.Keeper
 }
 
 func (suite *SimTestSuite) SetupTest() {
@@ -97,7 +96,6 @@ func (suite *SimTestSuite) SetupTest() {
 		&suite.mintKeeper,
 		&suite.slashingKeeper,
 		&suite.distrKeeper,
-		&suite.govKeeper,
 	)
 
 	suite.Require().NoError(err)
@@ -107,6 +105,18 @@ func (suite *SimTestSuite) SetupTest() {
 	// remove genesis validator account
 	suite.accounts = accounts[1:]
 
+	// Initialize module accounts first
+	// Initialize mint module account
+	mintModuleAcc := authtypes.NewEmptyModuleAccount(minttypes.ModuleName, authtypes.Minter)
+	mintModuleAcc.SetAccountNumber(suite.accountKeeper.NextAccountNumber(suite.ctx))
+	suite.accountKeeper.SetModuleAccount(suite.ctx, mintModuleAcc)
+
+	// Initialize distribution module account
+	distrModuleAcc := authtypes.NewEmptyModuleAccount(distrtypes.ModuleName, authtypes.Minter, authtypes.Burner)
+	distrModuleAcc.SetAccountNumber(suite.accountKeeper.NextAccountNumber(suite.ctx))
+	suite.accountKeeper.SetModuleAccount(suite.ctx, distrModuleAcc)
+
+	// Initialize regular accounts
 	initAmt := suite.stakingKeeper.TokensFromConsensusPower(suite.ctx, 200)
 	initCoins := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, initAmt))
 
@@ -117,8 +127,28 @@ func (suite *SimTestSuite) SetupTest() {
 		suite.Require().NoError(banktestutil.FundAccount(suite.ctx, suite.bankKeeper, account.Address, initCoins))
 	}
 
+	// Initialize params
 	suite.Require().NoError(suite.mintKeeper.Params.Set(suite.ctx, minttypes.DefaultParams()))
 	suite.Require().NoError(suite.mintKeeper.Minter.Set(suite.ctx, minttypes.DefaultInitialMinter()))
+
+	// Initialize staking params
+	stakingParams := stakingtypes.DefaultParams()
+	suite.Require().NoError(suite.stakingKeeper.SetParams(suite.ctx, stakingParams))
+
+	// Initialize distribution params
+	distrParams := distrtypes.DefaultParams()
+	suite.Require().NoError(suite.distrKeeper.Params.Set(suite.ctx, distrParams))
+
+	// Initialize slashing params
+	slashingParams := slashingtypes.DefaultParams()
+	suite.Require().NoError(suite.slashingKeeper.SetParams(suite.ctx, slashingParams))
+
+	// Setup validator
+	validator, err := getTestingValidator0(suite.ctx, suite.stakingKeeper, suite.accounts)
+	suite.Require().NoError(err)
+	suite.stakingKeeper.SetValidator(suite.ctx, validator)
+	suite.stakingKeeper.SetValidatorByConsAddr(suite.ctx, validator)
+	suite.stakingKeeper.SetValidatorByPowerIndex(suite.ctx, validator)
 }
 
 func TestSimTestSuite(t *testing.T) {
@@ -135,7 +165,7 @@ func (suite *SimTestSuite) TestWeightedOperations() {
 		opMsgRoute string
 		opMsgName  string
 	}{
-		{simulation.DefaultWeightMsgUnjail, types.ModuleName, sdk.MsgTypeURL(&types.MsgUnjail{})},
+		{simulation.DefaultWeightMsgUnjail, slashingtypes.ModuleName, sdk.MsgTypeURL(&slashingtypes.MsgUnjail{})},
 	}
 
 	weightedOps := simulation.WeightedOperations(suite.interfaceRegistry, appParams, suite.codec, suite.txConfig, suite.accountKeeper, suite.bankKeeper, suite.slashingKeeper, suite.stakingKeeper)
@@ -166,7 +196,7 @@ func (suite *SimTestSuite) TestSimulateMsgUnjail() {
 	suite.stakingKeeper.SetValidatorByConsAddr(ctx, validator0)
 	val0ConsAddress, err := validator0.GetConsAddr()
 	suite.Require().NoError(err)
-	info := types.NewValidatorSigningInfo(val0ConsAddress, int64(4), int64(3),
+	info := slashingtypes.NewValidatorSigningInfo(val0ConsAddress, int64(4), int64(3),
 		time.Unix(2, 0), false, int64(10))
 	suite.slashingKeeper.SetValidatorSigningInfo(ctx, val0ConsAddress, info)
 
@@ -191,7 +221,7 @@ func (suite *SimTestSuite) TestSimulateMsgUnjail() {
 	operationMsg, futureOperations, err := op(suite.r, suite.app.BaseApp, ctx, suite.accounts, "")
 	suite.Require().NoError(err)
 
-	var msg types.MsgUnjail
+	var msg slashingtypes.MsgUnjail
 	err = proto.Unmarshal(operationMsg.Msg, &msg)
 	suite.Require().NoError(err)
 	suite.Require().True(operationMsg.OK)
