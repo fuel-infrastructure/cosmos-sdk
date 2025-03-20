@@ -1,4 +1,5 @@
 syntax = "proto3";
+package cosmos.baseapp.testutil;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/any.proto";
