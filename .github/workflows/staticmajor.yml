@@ -13,6 +13,11 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22.11"
+          check-latest: true
       - name: Staticmajor action
         id: staticmajor
         uses: orijtech/staticmajor-action@main
