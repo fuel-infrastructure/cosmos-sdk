@@ -114,7 +114,7 @@ func initFixture(t testing.TB) *fixture {
 		types.ModuleName:        {authtypes.Minter},
 		types.BondedPoolName:    {authtypes.Burner, authtypes.Staking},
 		types.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
-		govtypes.ModuleName:     {authtypes.Burner},
+		govtypes.ModuleName:     {},
 	}
 
 	accountKeeper := authkeeper.NewAccountKeeper(
