@@ -11,7 +11,20 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func TestBeach32ifPbKey(t *testing.T) {
+// Deprecated: TestBech32IfPbKey exists only for backward compatibility with legacy bech32
+// pubkey formats. It will be removed in a future release along with the rest of this package.
+//
+// This test requires both 'ledger' and 'test_ledger_mock' build tags to run, otherwise it will be skipped.
+// The ledger mock will use the test mnemonic to generate keys that match the hardcoded test vector.
+//
+// For convenience:
+// go test -tags "ledger test_ledger_mock" ./types/bech32/legacybech32/... -v
+func TestBech32IfPbKey(t *testing.T) {
+	_, err := ledger.NewPrivKeySecp256k1Unsafe(*hd.NewFundraiserParams(0, sdk.CoinType, 0))
+	if err != nil {
+		t.Skip("ledger support is not available")
+	}
+
 	require := require.New(t)
 	path := *hd.NewFundraiserParams(0, sdk.CoinType, 0)
 	priv, err := ledger.NewPrivKeySecp256k1Unsafe(path)
