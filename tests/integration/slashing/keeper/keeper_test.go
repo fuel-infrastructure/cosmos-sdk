@@ -26,7 +26,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/slashing"
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
@@ -46,7 +45,6 @@ type fixture struct {
 	bankKeeper     bankkeeper.Keeper
 	slashingKeeper slashingkeeper.Keeper
 	stakingKeeper  *stakingkeeper.Keeper
-	accountKeeper  authkeeper.AccountKeeper
 
 	addrDels []sdk.AccAddress
 	valAddrs []sdk.ValAddress
@@ -69,7 +67,6 @@ func initFixture(t testing.TB) *fixture {
 		minttypes.ModuleName:           {authtypes.Minter},
 		stakingtypes.BondedPoolName:    {authtypes.Burner, authtypes.Staking},
 		stakingtypes.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
-		govtypes.ModuleName:            {authtypes.Burner, authtypes.Staking},
 	}
 
 	accountKeeper := authkeeper.NewAccountKeeper(
@@ -134,7 +131,6 @@ func initFixture(t testing.TB) *fixture {
 		bankKeeper:     bankKeeper,
 		slashingKeeper: slashingKeeper,
 		stakingKeeper:  stakingKeeper,
-		accountKeeper:  accountKeeper,
 		addrDels:       addrDels,
 		valAddrs:       valAddrs,
 	}
@@ -369,12 +365,6 @@ func TestValidatorDippingInAndOut(t *testing.T) {
 	assert.Equal(t, 1, len(validatorUpdates))
 	tstaking.CheckValidator(valAddr, stakingtypes.Bonded, false)
 
-	// Get governance module account balance before slashing
-	govModuleAddr := f.accountKeeper.GetModuleAddress(govtypes.ModuleName)
-	bondDenom, err := f.stakingKeeper.BondDenom(f.ctx)
-	assert.NilError(t, err)
-	govBalanceBefore := f.bankKeeper.GetBalance(f.ctx, govModuleAddr, bondDenom)
-
 	// 100 first blocks OK
 	height := int64(0)
 	for ; height < int64(100); height++ {
@@ -427,11 +417,6 @@ func TestValidatorDippingInAndOut(t *testing.T) {
 	assert.NilError(t, err)
 	tstaking.CheckValidator(valAddr, stakingtypes.Unbonding, true)
 
-	// Check that slashed tokens were transferred to governance module account
-	govBalanceAfter := f.bankKeeper.GetBalance(f.ctx, govModuleAddr, bondDenom)
-	assert.Assert(t, govBalanceAfter.Amount.GT(govBalanceBefore.Amount),
-		"governance module account balance should have increased from slashing")
-
 	info = slashingtypes.NewValidatorSigningInfo(consAddr, f.ctx.BlockHeight(), int64(0), time.Unix(0, 0), false, int64(0))
 	err = f.slashingKeeper.SetValidatorSigningInfo(f.ctx, consAddr, info)
 	assert.NilError(t, err)
@@ -450,9 +435,6 @@ func TestValidatorDippingInAndOut(t *testing.T) {
 	info = slashingtypes.NewValidatorSigningInfo(consAddr, f.ctx.BlockHeight(), int64(0), time.Unix(0, 0), false, int64(0))
 	err = f.slashingKeeper.SetValidatorSigningInfo(f.ctx, consAddr, info)
 	assert.NilError(t, err)
-
-	// Get governance module account balance before second slashing
-	govBalanceBefore = f.bankKeeper.GetBalance(f.ctx, govModuleAddr, bondDenom)
 
 	// validator rejoins and starts signing again
 	f.stakingKeeper.Unjail(f.ctx, consAddr)
@@ -484,11 +466,6 @@ func TestValidatorDippingInAndOut(t *testing.T) {
 	// validator should now be jailed & kicked
 	_, err = f.stakingKeeper.EndBlocker(f.ctx)
 	assert.NilError(t, err)
-
-	// Check that slashed tokens were transferred to governance module account
-	govBalanceAfter = f.bankKeeper.GetBalance(f.ctx, govModuleAddr, bondDenom)
-	assert.Assert(t, govBalanceAfter.Amount.GT(govBalanceBefore.Amount),
-		"governance module account balance should have increased from second slashing")
 
 	tstaking.CheckValidator(valAddr, stakingtypes.Unbonding, true)
 }

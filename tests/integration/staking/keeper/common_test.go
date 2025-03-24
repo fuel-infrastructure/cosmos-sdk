@@ -26,10 +26,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/cosmos/cosmos-sdk/x/gov"
-	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
-	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
@@ -49,7 +45,6 @@ type fixture struct {
 	accountKeeper authkeeper.AccountKeeper
 	bankKeeper    bankkeeper.Keeper
 	stakingKeeper *stakingkeeper.Keeper
-	govKeeper     *govkeeper.Keeper
 }
 
 func init() {
@@ -98,9 +93,9 @@ func createValidators(t *testing.T, f *fixture, powers []int64) ([]sdk.AccAddres
 
 func initFixture(t testing.TB) *fixture {
 	keys := storetypes.NewKVStoreKeys(
-		authtypes.StoreKey, banktypes.StoreKey, types.StoreKey, govtypes.StoreKey,
+		authtypes.StoreKey, banktypes.StoreKey, types.StoreKey,
 	)
-	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, staking.AppModuleBasic{}, gov.AppModuleBasic{}).Codec
+	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, staking.AppModuleBasic{}).Codec
 
 	logger := log.NewTestLogger(t)
 	cms := integration.CreateMultiStore(keys, logger)
@@ -114,7 +109,6 @@ func initFixture(t testing.TB) *fixture {
 		types.ModuleName:        {authtypes.Minter},
 		types.BondedPoolName:    {authtypes.Burner, authtypes.Staking},
 		types.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
-		govtypes.ModuleName:     {authtypes.Burner},
 	}
 
 	accountKeeper := authkeeper.NewAccountKeeper(
@@ -141,29 +135,14 @@ func initFixture(t testing.TB) *fixture {
 
 	stakingKeeper := stakingkeeper.NewKeeper(cdc, runtime.NewKVStoreService(keys[types.StoreKey]), accountKeeper, bankKeeper, authority.String(), addresscodec.NewBech32Codec(sdk.Bech32PrefixValAddr), addresscodec.NewBech32Codec(sdk.Bech32PrefixConsAddr))
 
-	// Initialize governance keeper
-	govKeeper := govkeeper.NewKeeper(
-		cdc,
-		runtime.NewKVStoreService(keys[govtypes.StoreKey]),
-		accountKeeper,
-		bankKeeper,
-		stakingKeeper,
-		nil, // distribution keeper not needed for these tests
-		nil, // router not needed for these tests
-		govtypes.DefaultConfig(),
-		authority.String(),
-	)
-
 	authModule := auth.NewAppModule(cdc, accountKeeper, authsims.RandomGenesisAccounts, nil)
 	bankModule := bank.NewAppModule(cdc, bankKeeper, accountKeeper, nil)
 	stakingModule := staking.NewAppModule(cdc, stakingKeeper, accountKeeper, bankKeeper, nil)
-	govModule := gov.NewAppModule(cdc, govKeeper, accountKeeper, bankKeeper, nil)
 
 	integrationApp := integration.NewIntegrationApp(newCtx, logger, keys, cdc, map[string]appmodule.AppModule{
 		authtypes.ModuleName: authModule,
 		banktypes.ModuleName: bankModule,
 		types.ModuleName:     stakingModule,
-		govtypes.ModuleName:  govModule,
 	})
 
 	sdkCtx := sdk.UnwrapSDKContext(integrationApp.Context())
@@ -175,9 +154,6 @@ func initFixture(t testing.TB) *fixture {
 	// set default staking params
 	assert.NilError(t, stakingKeeper.SetParams(sdkCtx, types.DefaultParams()))
 
-	// set default gov params
-	assert.NilError(t, govKeeper.Params.Set(sdkCtx, govv1.DefaultParams()))
-
 	f := fixture{
 		app:           integrationApp,
 		sdkCtx:        sdkCtx,
@@ -186,7 +162,6 @@ func initFixture(t testing.TB) *fixture {
 		accountKeeper: accountKeeper,
 		bankKeeper:    bankKeeper,
 		stakingKeeper: stakingKeeper,
-		govKeeper:     govKeeper,
 	}
 
 	return &f
