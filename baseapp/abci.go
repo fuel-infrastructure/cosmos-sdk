@@ -10,6 +10,7 @@ import (
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/gogoproto/proto"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -787,6 +788,12 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 	// vote extensions, so skip those.
 	txResults := make([]*abci.ExecTxResult, 0, len(req.Txs))
 	for _, rawTx := range req.Txs {
+		// Unwrap the blob tx if necessary.
+		blobTx, isBlobTx := cmttypes.UnmarshalBlobTx(rawTx)
+		if isBlobTx {
+			rawTx = blobTx.Tx
+		}
+
 		var response *abci.ExecTxResult
 
 		if _, err := app.txDecoder(rawTx); err == nil {
