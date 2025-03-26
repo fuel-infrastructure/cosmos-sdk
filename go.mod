@@ -2,6 +2,8 @@ go 1.22.11
 
 module github.com/cosmos/cosmos-sdk
 
+replace github.com/cometbft/cometbft v0.38.17 => github.com/fuel-infrastructure/cometbft v0.38.18-0.20250326134929-1c6d0b2ab208
+
 require (
 	cosmossdk.io/api v0.7.6
 	cosmossdk.io/collections v0.4.0
